@@ -143,7 +143,17 @@ async def process_message(message):
 
     g_word.user_attempts[user_id] = count + 1
 
-    await message.reply(f"{message.author.mention}\n📊 {result} (+{score})")
+    embed = discord.Embed(
+    title="📊 Sentence Evaluation",
+    description=result,
+    color=discord.Color.blue()
+    )
+    embed.add_field(name="Points Earned", value=f"+{score}", inline=False)
+    embed.set_footer(text=f"User: {message.author.name}")
+    await message.reply(
+        content=message.author.mention,
+        embed=embed
+    )
 
 
 # ================= WORKERS =================
