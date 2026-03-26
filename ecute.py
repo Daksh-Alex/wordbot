@@ -58,13 +58,16 @@ async def grade_sentence(word, sentence):
     payload = {
         "model": "llama-3.1-8b-instant",
         "messages": [
-            {"role": "system", "content": "Strict evaluator"},
+            {"role": "system", "content": "Lenient evaluator"},
             {"role": "user", "content": f"""
 Word: {word}
 Sentence: {sentence}
 
 Return:
-Score: X/10
+Score: X/10 (int only)
+give full scores to creative sentences with no grammetical error,
+make sure to be fair grading, for too vague sentences give 0 also),
+the idea is to do fair marking and give the right reason.
 Reason: short
 """}
         ],
