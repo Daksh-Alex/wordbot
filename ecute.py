@@ -171,21 +171,21 @@ async def process_message(message):
             return
 
         # ================= AI GRADING =================
-        print("🧠 Sending to AI for grading...")
         result = await grade_sentence(
-            g_word.current_word,
-            message.content[:200]
+        g_word.current_word,
+        message.content[:200]
         )
-
-        print(f"📊 AI Result: {result}")
-
         # ================= SCORE EXTRACTION =================
         match = re.search(r"(\d+)/10", result)
-        score = int(match.group(1)) if match else 0
+        original_score = int(match.group(1)) if match else 0
 
-        # Reduce score if multiple attempts
+        score = original_score
+        # Apply attempt penalty
         if count > 0:
             score = max(score - 2, 1)
+            # 🔥 Sync displayed score with final score
+            
+        result = re.sub(r"\d+/10", f"{score}/10", result)
 
         # ================= DATABASE UPDATE =================
         update_score(user_id, message.author.name, score)
