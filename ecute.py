@@ -194,7 +194,7 @@ async def worker():
 
 # ================= COMMANDS =================
 
-@tree.command(name="leaderboard", description="Top 10 players")
+@tree.command(name="leaderboard", description="View top 10 players")
 async def leaderboard(interaction: discord.Interaction):
 
     cursor.execute(
@@ -225,7 +225,7 @@ async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
-@tree.command(name="fetchword", description="Resend current word")
+@tree.command(name="wod", description="📌 Show the current Word of the Day again (admin only)")
 async def fetchword(interaction: discord.Interaction):
 
     if not interaction.user.guild_permissions.administrator:
@@ -240,7 +240,7 @@ async def fetchword(interaction: discord.Interaction):
     )
 
 
-@tree.command(name="fetchnewword", description="Force fetch new word")
+@tree.command(name="fetch", description="Fetch a new word manually and reset the game (admin only)")
 async def fetchnewword(interaction: discord.Interaction):
 
     await interaction.response.defer()
