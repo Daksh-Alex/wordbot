@@ -279,6 +279,12 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    # 🎯 ONLY monitor your specific channel
+    if message.channel.id != DISCORD_CHANNEL_ID:
+        return
+
+    print(f"👀 Monitoring message: {message.content}")  # debug log
+
     await task_queue.put(message)
 
 
