@@ -57,11 +57,12 @@ async def grade_sentence(word, sentence):
     payload = {
         "model": "llama-3.1-8b-instant",
         "messages": [
-            {"role": "system", "content": "Strict evaluator"},
+            {"role": "system", "content": "lenient evaluator"},
             {"role": "user", "content": f"""
 Word: {word}
 Sentence: {sentence}
-
+(10/10 for perfect sentence)
+(0/1 for meaning less sentence or sentence containing just {word})
 Return:
 Score: X/10
 Reason: short
