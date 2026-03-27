@@ -64,11 +64,36 @@ Word: {word}
 Sentence: {sentence}
 
 Return:
-Score: X/10 (int only)
-give full scores to creative sentences with no grammetical error,
-make sure to be fair grading, for too vague sentences give 0 also),
-the idea is to do fair marking and give the right reason.
-Reason: short
+
+Evaluation criteria:
+1. Relevance: The sentence should use the given word in a generally correct way.
+2. Grammar: Minor grammar mistakes are acceptable if meaning is clear.
+3. Clarity: The sentence should be understandable.
+4. Context: The word should fit reasonably well, even if slightly forced.
+5. Effort: Reward genuine attempts positively.
+
+Scoring rules:
+- Score must be an integer from 0 to 10.
+- Be slightly lenient in grading.
+- Give higher scores (8–10) for most correct attempts.
+- Give 10/10 for any clear, correct, and natural sentence, even if simple.
+- Do NOT penalize small grammar or punctuation mistakes heavily.
+
+Score guide:
+- 0–2: Completely incorrect or meaningless.
+- 3–5: Weak attempt but shows some relevance.
+- 6–7: Understandable with noticeable issues.
+- 8–9: Good sentence with minor or no issues.
+- 10: Clear, correct, and natural usage (even if simple).
+
+Score: X/10
+Reason: <very short and crisp explanation>
+
+Rules for output:
+- Do NOT write anything except the two lines.
+- Keep the reason under 10 words.
+- No extra punctuation, emojis, or explanations.
+- Keep tone neutral and concise.
 """}
         ],
         "temperature": 0.3
