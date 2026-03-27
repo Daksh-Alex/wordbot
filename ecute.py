@@ -293,8 +293,11 @@ async def fetchword(interaction: discord.Interaction):
     )
 
 
-@tree.command(name="fetch", description="Fetch a new word manually and reset the game (admin only)")
-async def fetchnewword(interaction: discord.Interaction):
+@tree.command(
+    name="fetch",
+    description="⚡ Force fetch latest word (admin only)"
+)
+async def fetch(interaction: discord.Interaction):
 
     await interaction.response.defer()
 
@@ -302,16 +305,46 @@ async def fetchnewword(interaction: discord.Interaction):
         await interaction.followup.send("🚫 Admin only command.")
         return
 
-    word, meaning = await g_word.get_merriam_webster_word()
+    old_word = g_word.current_word
+    print("⚡ Manual fetch triggered...")
 
+    word = old_word
+    meaning = g_word.current_meaning
+
+    # ================= RETRY SYSTEM =================
+    for i in range(3):
+        try:
+            new_word, new_meaning = await g_word.get_merriam_webster_word()
+
+            print(f"🔁 Attempt {i+1}: fetched '{new_word}'")
+
+            if new_word != old_word:
+                word = new_word
+                meaning = new_meaning
+                break
+
+        except Exception as e:
+            print(f"❌ Fetch error (attempt {i+1}):", e)
+
+    # ================= SAME WORD CHECK =================
+    if word == old_word:
+        await interaction.followup.send(
+            f"⚠️ No new word released yet.\nCurrent word is still **{old_word.upper()}**"
+        )
+        print("⚠️ Same word after retries")
+        return
+
+    # ================= UPDATE GAME =================
     g_word.current_word = word
     g_word.current_meaning = meaning
     g_word.active_game = True
     g_word.user_attempts.clear()
 
     await interaction.followup.send(
-        f"⚡ **New Word:** {word.upper()}\n📖 {meaning}"
+        f"🔥 **New Word Fetched:** {word.upper()}\n📖 {meaning}"
     )
+
+    print(f"✅ New word updated: {word}")
 
 
 # ================= EVENTS =================
