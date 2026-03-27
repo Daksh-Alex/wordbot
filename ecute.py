@@ -20,7 +20,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-DISCORD_CHANNEL_ID = YOUR_CHANNEL_ID  # replace
+DISCORD_CHANNEL_ID = 1486439713949614120  # replace
 
 # ================= DB =================
 db = mysql.connector.connect(
