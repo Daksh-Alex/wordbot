@@ -138,49 +138,102 @@ def update_score(user_id, username, points):
 
 # ================= PROCESS =================
 async def process_message(message):
-    if not g_word.active_game or not g_word.current_word:
-        return
+    try:
+        print(f"⚙️ Processing: {message.content}")
 
-    if not contains_word(message.content, g_word.current_word):
-        return
+        # ================= BASIC CHECKS =================
+        if not g_word.active_game or not g_word.current_word:
+            print("❌ No active game")
+            return
 
-    user_id = message.author.id
+        # ================= CHANNEL SAFETY =================
+        if message.channel.id != DISCORD_CHANNEL_ID:
+            print("❌ Wrong channel")
+            return
 
-    if is_spamming(user_id):
-        await message.reply("⏳ Cooldown active.")
-        return
+        # ================= WORD CHECK =================
+        if not contains_word(message.content, g_word.current_word):
+            print(f"❌ Word '{g_word.current_word}' not found in sentence")
+            return
 
-    count = g_word.user_attempts.get(user_id, 0)
+        user_id = message.author.id
 
-    if count >= g_word.MAX_ATTEMPTS:
-        await message.reply("⚠️ Max attempts reached")
-        return
+        # ================= SPAM PROTECTION =================
+        if is_spamming(user_id):
+            await message.reply("⏳ Slow down! Cooldown active.")
+            return
 
-    result = await grade_sentence(g_word.current_word, message.content[:200])
+        # ================= ATTEMPT LIMIT =================
+        count = g_word.user_attempts.get(user_id, 0)
 
-    match = re.search(r"(\d+)/10", result)
-    score = int(match.group(1)) if match else 0
+        if count >= g_word.MAX_ATTEMPTS:
+            await message.reply("⚠️ Max attempts reached for this word.")
+            return
 
-    if count > 0:
-        score = max(score - 2, 1)
+        # ================= AI GRADING =================
+        print("🧠 Sending to AI for grading...")
+        result = await grade_sentence(
+            g_word.current_word,
+            message.content[:200]
+        )
 
-    update_score(user_id, message.author.name, score)
+        print(f"📊 AI Result: {result}")
 
-    g_word.user_attempts[user_id] = count + 1
+        # ================= SCORE EXTRACTION =================
+        match = re.search(r"(\d+)/10", result)
+        score = int(match.group(1)) if match else 0
 
-    embed = discord.Embed(
-    title="📊 Sentence Evaluation",
-    description=result,
-    color=discord.Color.blue()
-    )
-    embed.add_field(name="Points Earned", value=f"+{score}", inline=False)
-    embed.set_footer(text=f"User: {message.author.name}")
-    await message.reply(
-        content=message.author.mention,
-        embed=embed
-    )
+        # Reduce score if multiple attempts
+        if count > 0:
+            score = max(score - 2, 1)
 
+        # ================= DATABASE UPDATE =================
+        update_score(user_id, message.author.name, score)
 
+        # Update attempts
+        g_word.user_attempts[user_id] = count + 1
+
+        # ================= EMBED RESPONSE =================
+        color = (
+            discord.Color.green() if score >= 7 else
+            discord.Color.orange() if score >= 4 else
+            discord.Color.red()
+        )
+
+        embed = discord.Embed(
+            title="📊 Sentence Evaluation",
+            description=result,
+            color=color
+        )
+
+        embed.add_field(
+            name="Word",
+            value=g_word.current_word.upper(),
+            inline=True
+        )
+
+        embed.add_field(
+            name="Points Earned",
+            value=f"+{score}",
+            inline=True
+        )
+
+        embed.set_footer(
+            text=f"{message.author.name} • Attempt {count + 1}/{g_word.MAX_ATTEMPTS}"
+        )
+
+        # ================= SEND RESPONSE =================
+        await message.reply(
+            content=message.author.mention,
+            embed=embed
+        )
+
+        print("✅ Response sent")
+
+    except Exception as e:
+        print("❌ ERROR in process_message:", e)
+        
+        
 # ================= WORKERS =================
 async def worker():
     while True:
