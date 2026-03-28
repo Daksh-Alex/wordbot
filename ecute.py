@@ -264,7 +264,6 @@ async def fetch(interaction: discord.Interaction):
                     value=did_you_know,
                     inline=False
                 )
-)
 
             await interaction.followup.send(embed=embed)
             return
