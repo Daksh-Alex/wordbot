@@ -126,7 +126,7 @@ async def process(message):
     if not word or word not in content:
         return
 
-    clean = re.sub(r"\s+", " ", content.strip())
+    clean = re.sub(r"\s+", " ", content.strip().lower())
 
     result = await grade_sentence(clean, word)
     
