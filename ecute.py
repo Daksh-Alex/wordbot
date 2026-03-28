@@ -46,6 +46,7 @@ def save_submission(user_id, sentence):
         )
         db.commit()
         return True
+
     except Exception as e:
         if "Duplicate entry" in str(e):
             return False
