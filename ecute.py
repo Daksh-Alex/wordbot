@@ -250,10 +250,21 @@ async def fetch(interaction: discord.Interaction):
             db.commit()
 
             embed = discord.Embed(
-                title="🔥 New Word",
-                description=f"**{new_word.upper()}**\n\n{new_meaning}",
-                color=discord.Color.green()
+                title=f"📌 {new_word.upper()}",
+                color=discord.Color.blue()
             )
+            embed.add_field(
+                name="📖 Meaning",
+                value=new_meaning or "Not available",
+                inline=False
+            )
+            if did_you_know:
+                embed.add_field(
+                    name="🧠 Did You Know?",
+                    value=did_you_know,
+                    inline=False
+                )
+)
 
             await interaction.followup.send(embed=embed)
             return
