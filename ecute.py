@@ -236,7 +236,7 @@ async def fetch(interaction: discord.Interaction):
     old_word = g_word.current_word
 
     for _ in range(3):
-        new_word, new_meaning = g_word.get_wod()
+        new_word, new_meaning, did_you_know = g_word.get_wod()
 
         if new_word and new_word != old_word:
             g_word.current_word = new_word
