@@ -68,7 +68,20 @@ async def grade_sentence(sentence, word):
                     "messages": [
                         {
                             "role": "system",
-                            "content": "Grade sentence. Output strictly: Result: X/10 Reason: short"
+                            "content": """
+                            Grade the sentence based on:
+                            1. Correct usage of the word
+                            2. Grammar
+                            3. Meaningfulness
+
+                            Be lenient.
+
+                            Give higher scores when word is used correctly even if sentence is simple.
+
+                            Output STRICTLY:
+                            Result: X/10
+                            Reason: short
+                            ="""
                         },
                         {
                             "role": "user",
