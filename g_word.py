@@ -9,10 +9,13 @@ STATE_FILE = "wod_state.json"
 
 current_word = None
 current_meaning = None
+current_dyk = None
 active_game = False
 user_attempts = {}
 MAX_ATTEMPTS = 2
 
+
+# ---------- STATE ----------
 
 def load_state():
     if not os.path.exists(STATE_FILE):
@@ -29,45 +32,76 @@ def save_state(word):
         json.dump({"word": word}, f)
 
 
+# ---------- FETCH + PARSE ----------
+
 def get_wod():
     try:
         feed = feedparser.parse("https://www.merriam-webster.com/wotd/feed/rss2")
 
         if not feed.entries:
-            return None, None
+            return None, None, None
 
         entry = feed.entries[0]
         word = entry.title.strip().lower()
-        meaning = BeautifulSoup(entry.description, "html.parser").text.strip()
 
-        return word, meaning
+        soup = BeautifulSoup(entry.description, "html.parser")
+        text = soup.get_text("\n")
+
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+        meaning = ""
+        did_you_know = ""
+
+        # 🔍 Extract Meaning (more accurate)
+        for line in lines:
+            if "is used to" in line.lower() or "means" in line.lower():
+                meaning = line
+                break
+
+        # fallback meaning
+        if not meaning and lines:
+            meaning = lines[0]
+
+        # 🔍 Extract Did You Know
+        for i, line in enumerate(lines):
+            if "did you know" in line.lower():
+                did_you_know = " ".join(lines[i+1:i+3])[:300]
+                break
+
+        return word, meaning, did_you_know
 
     except Exception as e:
         print("RSS error:", e)
-        return None, None
+        return None, None, None
 
+
+# ---------- MAIN LOOP ----------
 
 async def word_loop(bot, channel_id):
-    global current_word, current_meaning, active_game, user_attempts
+    global current_word, current_meaning, current_dyk, active_game, user_attempts
 
     last_announced = load_state()
 
     while True:
         try:
-            word, meaning = get_wod()
+            word, meaning, did_you_know = get_wod()
 
             if not word:
                 await asyncio.sleep(120)
                 continue
 
+            # first load
             if current_word is None:
                 current_word = word
                 current_meaning = meaning
+                current_dyk = did_you_know
                 active_game = True
 
+            # new word detected
             elif word != current_word and word != last_announced:
                 current_word = word
                 current_meaning = meaning
+                current_dyk = did_you_know
                 active_game = True
                 user_attempts.clear()
 
@@ -77,10 +111,25 @@ async def word_loop(bot, channel_id):
                 channel = bot.get_channel(channel_id)
                 if channel:
                     embed = discord.Embed(
-                        title="🔥 New Word of the Day",
-                        description=f"**{word.upper()}**\n\n{meaning}",
+                        title=f"📌 {word.upper()}",
                         color=discord.Color.blue()
                     )
+
+                    embed.add_field(
+                        name="📖 Meaning",
+                        value=meaning or "Not available",
+                        inline=False
+                    )
+
+                    if did_you_know:
+                        embed.add_field(
+                            name="🧠 Did You Know?",
+                            value=did_you_know,
+                            inline=False
+                        )
+
+                    embed.set_footer(text="Word of the Day")
+
                     await channel.send(embed=embed)
 
         except Exception as e:
