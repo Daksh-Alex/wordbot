@@ -134,7 +134,14 @@ async def process(message):
 
     await message.reply(embed=embed)
 
-
+def get_leaderboard():
+    cursor.execute("""
+        SELECT user_id, score
+        FROM leaderboard
+        ORDER BY score DESC
+        LIMIT 10
+    """)
+    return cursor.fetchall()
 # ================= EVENTS =================
 @client.event
 async def on_message(message):
@@ -158,6 +165,29 @@ async def on_ready():
 
 
 # ================= COMMANDS =================
+
+@tree.command(name="leaderboard", description="Top players")
+async def leaderboard(interaction: discord.Interaction):
+
+    rows = get_leaderboard()
+
+    if not rows:
+        await interaction.response.send_message("No data yet")
+        return
+
+    desc = ""
+
+    for i, (uid, score) in enumerate(rows, start=1):
+        desc += f"{i}. <@{uid}> — {score}\n"
+
+    embed = discord.Embed(
+        title="🏆 Leaderboard",
+        description=desc,
+        color=discord.Color.gold()
+    )
+
+    await interaction.response.send_message(embed=embed)
+
 
 @tree.command(name="wod", description="Show current word")
 async def wod(interaction: discord.Interaction):
