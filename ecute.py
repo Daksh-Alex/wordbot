@@ -128,20 +128,16 @@ async def process(message):
 
     clean = re.sub(r"\s+", " ", content.strip())
 
+    result = await grade_sentence(clean, word)
+    
     saved = save_submission(message.author.id, clean)
+    
     
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
 
-    result = await grade_sentence(clean, word)
-
-    saved = save_submission(message.author.id, clean)
-
-    if not saved:
-        await message.reply("❌ Duplicate sentence")
-        return
-
+    
     embed = discord.Embed(
         title="📊 Evaluation",
         description=result,
