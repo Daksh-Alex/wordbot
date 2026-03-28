@@ -55,6 +55,7 @@ def save_submission(user_id, sentence):
 
 
 # ================= AI GRADING =================
+
 async def grade_sentence(sentence, word):
     try:
         async with aiohttp.ClientSession() as session:
@@ -70,19 +71,18 @@ async def grade_sentence(sentence, word):
                         {
                             "role": "system",
                             "content": """
-                            Grade the sentence based on:
-                            1. Correct usage of the word
-                            2. Grammar
-                            3. Meaningfulness
+Grade the sentence based on:
+1. Correct usage of the word
+2. Grammar
+3. Meaningfulness
 
-                            Be lenient.
+Be lenient.
+Give higher scores if word is used correctly.
 
-                            Give higher scores when word is used correctly even if sentence is simple.
-
-                            Output STRICTLY:
-                            Result: X/10
-                            Reason: short
-                            ="""
+Output STRICTLY:
+Result: X/10
+Reason: short
+"""
                         },
                         {
                             "role": "user",
@@ -90,15 +90,24 @@ async def grade_sentence(sentence, word):
                         }
                     ]
                 },
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=6)
             ) as res:
+
                 data = await res.json()
+
+                # 🔍 DEBUG PRINT
+                print("AI RAW:", data)
+
+                # ❌ API ERROR CASE
+                if "choices" not in data:
+                    print("AI ERROR RESPONSE:", data)
+                    return "Result: 6/10 Reason: AI issue"
+
                 return data["choices"][0]["message"]["content"]
 
     except Exception as e:
-        print("AI error:", e)
-        return "Result: 5/10 Reason: fallback"
-
+        print("AI EXCEPTION:", e)
+        return "Result: 6/10 Reason: system error"
 
 # ================= WORKER =================
 async def worker():
