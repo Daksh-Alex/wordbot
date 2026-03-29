@@ -9,6 +9,8 @@ import aiohttp
 
 import g_word
 
+processing_users = set()
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -19,6 +21,7 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
+
 
 # ================= DB =================
 
@@ -260,55 +263,76 @@ async def worker():
 
 
 # ================= PROCESS =================
+
 async def process(message):
-    if message.author.bot:
-        return
-
-    if not g_word.active_game:
-        return
-
-    word = g_word.current_word
-    content = message.content.lower()
-
-    if not word or word not in content:
-        return
-
     uid = message.author.id
-    clean = re.sub(r"\s+", " ", content.strip())
 
-    if not save_submission(uid, clean):
-        await message.reply("❌ This sentence has already been used.")
+    if uid in processing_users:
         return
 
-    current_attempts = g_word.user_attempts.get(uid, 0)
+    processing_users.add(uid)
 
-    if current_attempts >= 2:
-        await message.reply("❌ You have used all 2 attempts.")
-        return
+    try:
+        if message.author.bot:
+            return
 
-    is_first_attempt = current_attempts == 0
-    g_word.user_attempts[uid] = current_attempts + 1
+        if not g_word.active_game:
+            return
 
-    result = await grade_sentence(clean, word)
+        word = g_word.current_word
+        content = message.content.lower()
 
-    match = re.search(r"Result:\s*(\d+)/10", result)
-    score = int(match.group(1)) if match else 7
+        if not word or word not in content:
+            return
 
-    if is_first_attempt:
-        update_leaderboard(uid, score)
+        # 🔥 NORMALIZE (fix duplicates)
+        clean = re.sub(r"\s+", " ", content.strip().lower())
+        clean = clean.rstrip(".!?")
 
-    embed = discord.Embed(
-        title="📊 Evaluation",
-        description=result,
-        color=get_color(score)
-    )
+        if not save_submission(uid, clean):
+            await message.reply("❌ This sentence has already been used.")
+            return
 
-    embed.set_footer(
-        text="Counted attempt (1/2)" if is_first_attempt else "Practice attempt"
-    )
+        current_attempts = g_word.user_attempts.get(uid, 0)
 
-    await message.reply(embed=embed)
+        if current_attempts >= 2:
+            await message.reply("❌ You have used all 2 attempts.")
+            return
 
+        is_first_attempt = current_attempts == 0
+        g_word.user_attempts[uid] = current_attempts + 1
+
+        result = await grade_sentence(clean, word)
+
+        match = re.search(r"Result:\s*(\d+)/10", result)
+        score = int(match.group(1)) if match else 7
+
+        if is_first_attempt:
+            update_leaderboard(uid, score)
+
+        # 🔥 CREATIVE DETECTION
+        creative = score == 10 and len(clean.split()) > 8
+
+        title = "📊 Evaluation"
+        if creative:
+            title += " 🔥"
+
+        embed = discord.Embed(
+            title=title,
+            description=result,
+            color=get_color(score)
+        )
+
+        if is_first_attempt:
+            embed.set_footer(text="🏆 Counted attempt (1/2)")
+        else:
+            embed.set_footer(text="🧪 Practice attempt")
+
+        await message.reply(embed=embed)
+
+    finally:
+        # 🔥 ALWAYS REMOVE USER (CRITICAL)
+        processing_users.discard(uid)
 
 # ================= EVENTS =================
 @client.event
