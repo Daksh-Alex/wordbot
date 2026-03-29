@@ -260,7 +260,14 @@ async def on_ready():
 
     if not hasattr(client, "started"):
         client.started = True
-        asyncio.create_task(g_word.word_loop(client, CHANNEL_ID))
+        asyncio.create_task(
+            g_word.word_loop(
+                client,
+                CHANNEL_ID,
+                save_wod,
+                clear_submissions
+            )
+        )
 
     for _ in range(3):
         asyncio.create_task(worker())
