@@ -187,13 +187,13 @@ async def process(message):
 
     clean = re.sub(r"\s+", " ", content.strip())
 
-    result = await grade_sentence(clean, word)
-
     saved = save_submission(uid, clean)
 
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
+        
+    result = await grade_sentence(clean, word)
 
     # 🔥 EXTRACT SCORE
     match = re.search(r"Result:\s*(\d+)/10", result)
