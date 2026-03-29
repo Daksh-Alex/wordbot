@@ -39,9 +39,21 @@ def safe_execute(query, params=None, fetch=False):
     global db, cursor
     try:
         cursor.execute(query, params or ())
+
         if fetch:
-            return cursor.fetchall()
-        return None
+            result = cursor.fetchall()
+        else:
+            # 🔥 fix unread result bug
+            try:
+                cursor.fetchall()
+            except:
+                pass
+            result = None
+
+        return result
+
+    except mysql.connector.errors.IntegrityError:
+        return "DUPLICATE"
 
     except Exception as e:
         print("DB error:", e)
@@ -81,18 +93,15 @@ queue = asyncio.Queue(maxsize=100)
 
 # ================= DUPLICATE =================
 def save_submission(user_id, sentence):
-    try:
-        safe_execute(
-            "INSERT INTO submissions (user_id, sentence) VALUES (%s,%s)",
-            (user_id, sentence)
-        )
-        return True
+    result = safe_execute(
+        "INSERT INTO submissions (user_id, sentence) VALUES (%s,%s)",
+        (user_id, sentence)
+    )
 
-    except Exception as e:
-        if "Duplicate entry" in str(e):
-            return False
-        print("DB error:", e)
+    if result == "DUPLICATE":
         return False
+
+    return True
 
 
 # ================= SCORE COLOR =================
@@ -174,27 +183,27 @@ async def process(message):
         return
 
     uid = message.author.id
-
-    # 🔥 ATTEMPT SYSTEM
     clean = re.sub(r"\s+", " ", content.strip())
-    
-    # 🔒 duplicate check FIRST
+
+    # 🔒 duplicate FIRST
     saved = save_submission(uid, clean)
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
-    # 🎯 attempt system AFTER duplicate passes
+
+    # 🎯 attempts AFTER duplicate
     if uid not in g_word.user_attempts:
         g_word.user_attempts[uid] = 0
-        
+
     if g_word.user_attempts[uid] >= 2:
         await message.reply("❌ You have used all 2 attempts.")
         return
+
     g_word.user_attempts[uid] += 1
-    # 🤖 now call AI
+
+    # 🤖 AI
     result = await grade_sentence(clean, word)
 
-    # 🔥 EXTRACT SCORE
     match = re.search(r"Result:\s*(\d+)/10", result)
     score = int(match.group(1)) if match else 7
 
