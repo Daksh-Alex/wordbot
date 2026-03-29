@@ -3,8 +3,6 @@ import feedparser
 from bs4 import BeautifulSoup
 import discord
 
-import ecute  # 🔥 for DB functions
-
 current_word = None
 current_meaning = None
 current_dyk = None
@@ -86,7 +84,7 @@ def get_wod():
 
 # ---------- MAIN LOOP ----------
 
-async def word_loop(bot, channel_id):
+async def word_loop(bot, channel_id, save_wod, clear_submissions):
     global current_word, current_meaning, current_dyk, active_game, user_attempts
 
     while True:
@@ -115,9 +113,8 @@ async def word_loop(bot, channel_id):
                 active_game = True
                 user_attempts.clear()
 
-                # 🔥 DB updates
-                ecute.save_wod(word, meaning, did_you_know)
-                ecute.clear_submissions()
+                save_wod(word, meaning, did_you_know)
+                clear_submissions()
 
                 channel = bot.get_channel(channel_id)
                 if channel:
