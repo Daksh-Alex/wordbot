@@ -177,6 +177,7 @@ async def worker():
 
 
 # ================= PROCESS =================
+
 async def process(message):
     if message.author.bot:
         return
@@ -193,39 +194,47 @@ async def process(message):
     uid = message.author.id
     clean = re.sub(r"\s+", " ", content.strip())
 
-    # 🔒 duplicate FIRST
+    # 🔒 DUPLICATE CHECK FIRST (no attempt loss)
     saved = save_submission(uid, clean)
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
 
-    # 🎯 attempts AFTER duplicate
-    if uid not in g_word.user_attempts:
-        g_word.user_attempts[uid] = 0
+    # 🎯 CHECK FIRST ATTEMPT BEFORE INCREMENT
+    current_attempts = g_word.user_attempts.get(uid, 0)
 
-    if g_word.user_attempts[uid] >= 2:
+    if current_attempts >= 2:
         await message.reply("❌ You have used all 2 attempts.")
         return
 
-    g_word.user_attempts[uid] += 1
+    is_first_attempt = current_attempts == 0
 
-    # 🤖 AI
+    # ➕ INCREMENT ATTEMPT
+    g_word.user_attempts[uid] = current_attempts + 1
+
+    # 🤖 AI GRADING
     result = await grade_sentence(clean, word)
 
+    # 🔢 EXTRACT SCORE
     match = re.search(r"Result:\s*(\d+)/10", result)
     score = int(match.group(1)) if match else 7
-    
-    is_first_attempt = g_word.user_attempts[uid] == 1
+
+    # 🏆 UPDATE LEADERBOARD (ONLY FIRST ATTEMPT)
     if is_first_attempt:
         update_leaderboard(uid, score)
 
+    # 🎨 EMBED COLOR BASED ON SCORE
     embed = discord.Embed(
         title="📊 Evaluation",
         description=result,
         color=get_color(score)
     )
 
-    embed.set_footer(text=f"Attempts: {g_word.user_attempts[uid]}/2")
+    # 🧠 FOOTER (CLEAR UX)
+    if is_first_attempt:
+        embed.set_footer(text="Counted attempt (1/2)")
+    else:
+        embed.set_footer(text="Practice attempt (not counted)")
 
     await message.reply(embed=embed)
 
