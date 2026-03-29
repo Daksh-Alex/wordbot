@@ -376,4 +376,63 @@ async def fetch(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+# ================= LEADERBOARD =================
+
+def get_leaderboard():
+    return safe_execute("""
+        SELECT user_id, score
+        FROM leaderboard
+        ORDER BY score DESC
+        LIMIT 10
+    """, fetch=True)
+
+
+def get_user_rank(user_id):
+    row = safe_execute(
+        "SELECT score FROM leaderboard WHERE user_id=%s",
+        (user_id,),
+        fetch=True
+    )
+
+    if not row:
+        return None, 0
+
+    score = row[0][0]
+
+    rank = safe_execute("""
+        SELECT COUNT(*) + 1 FROM leaderboard
+        WHERE score > %s
+    """, (score,), fetch=True)[0][0]
+
+    return rank, score
+
+
+@tree.command(name="leaderboard")
+async def leaderboard(interaction: discord.Interaction):
+
+    rows = get_leaderboard()
+
+    if not rows:
+        await interaction.response.send_message("No leaderboard data yet.")
+        return
+
+    desc = ""
+    for i, (uid, score) in enumerate(rows, start=1):
+        desc += f"{i}. <@{uid}> — {score}\n"
+
+    embed = discord.Embed(
+        title="🏆 Leaderboard",
+        description=desc,
+        color=discord.Color.gold()
+    )
+
+    rank, score = get_user_rank(interaction.user.id)
+
+    if rank:
+        embed.set_footer(text=f"Your rank: #{rank} • Score: {score}")
+    else:
+        embed.set_footer(text="You are not ranked yet.")
+
+    await interaction.response.send_message(embed=embed)
+
 client.run(TOKEN)
