@@ -51,18 +51,39 @@ def get_wod():
 
         meaning = ""
         did_you_know = ""
-
-        # 🔍 Extract Meaning (better accuracy)
+        # 🔍 Extract Meaning (robust)
         for line in lines:
-            if "is used to" in line.lower() or "means" in line.lower():
-                meaning = line
-                break
-
-        # fallback meaning (avoid garbage)
+            lower = line.lower()
+            # ❌ skip junk lines
+            if "word of the day" in lower:
+                continue
+            if "merriam-webster" in lower:
+               continue
+            if "did you know" in lower:
+               continue
+            # ✅ definition-like lines
+            if (
+                "means" in lower or
+                "is used to" in lower or
+                "refers to" in lower or
+                "describes" in lower or
+                "is" in lower
+            ):
+                if len(line.split()) > 6:
+                    meaning = line.strip(":- ")
+                   break
+        # 🔁 fallback (safe)
         if not meaning:
             for line in lines:
+                lower = line.lower()
+                if "word of the day" in lower:
+                    continue
+                if "merriam-webster" in lower:
+                   continue
+                if "did you know" in lower:
+                    continue
                 if len(line.split()) > 6:
-                    meaning = line
+                    meaning = line.strip(":- ")
                     break
 
         # 🔍 Extract Did You Know
