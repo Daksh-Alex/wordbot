@@ -103,7 +103,7 @@ async def word_loop(bot, channel_id, save_wod, clear_submissions):
                 active_game = True
 
                 # 🔥 save to DB
-                ecute.save_wod(word, meaning, did_you_know)
+                save_wod(word, meaning, did_you_know)
 
             # new word detected
             elif word != current_word:
