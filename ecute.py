@@ -21,30 +21,71 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # ================= DB =================
-db = mysql.connector.connect(
-    host="localhost",
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database="wordbot"
-)
+
+def get_db():
+    return mysql.connector.connect(
+        host="localhost",
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database="wordbot",
+        autocommit=True
+    )
+
+db = get_db()
 cursor = db.cursor()
+
+
+def safe_execute(query, params=None, fetch=False):
+    global db, cursor
+    try:
+        cursor.execute(query, params or ())
+        if fetch:
+            return cursor.fetchall()
+        return None
+
+    except Exception as e:
+        print("DB error:", e)
+
+        try:
+            db.reconnect(attempts=3, delay=2)
+            cursor = db.cursor()
+
+            cursor.execute(query, params or ())
+            if fetch:
+                return cursor.fetchall()
+        except Exception as e2:
+            print("Reconnect failed:", e2)
+
+        return None
+
+
+async def keep_db_alive():
+    global db, cursor
+    while True:
+        try:
+            cursor.execute("SELECT 1")
+        except:
+            try:
+                db.reconnect(attempts=3, delay=2)
+                cursor = db.cursor()
+                print("DB reconnected (keepalive)")
+            except Exception as e:
+                print("Keepalive failed:", e)
+
+        await asyncio.sleep(300)
+
 
 # ================= QUEUE =================
 queue = asyncio.Queue(maxsize=100)
 
+
 # ================= DUPLICATE =================
-def is_duplicate(sentence):
-    cursor.execute("SELECT 1 FROM submissions WHERE sentence=%s", (sentence,))
-    return cursor.fetchone() is not None
-
-
 def save_submission(user_id, sentence):
     try:
-        cursor.execute(
+        safe_execute(
             "INSERT INTO submissions (user_id, sentence) VALUES (%s,%s)",
             (user_id, sentence)
         )
-        db.commit()
         return True
 
     except Exception as e:
@@ -54,8 +95,17 @@ def save_submission(user_id, sentence):
         return False
 
 
-# ================= AI GRADING =================
+# ================= SCORE COLOR =================
+def get_color(score):
+    if score <= 5:
+        return discord.Color.red()
+    elif score < 10:
+        return discord.Color.green()
+    else:
+        return discord.Color.gold()
 
+
+# ================= AI =================
 async def grade_sentence(sentence, word):
     try:
         async with aiohttp.ClientSession() as session:
@@ -70,19 +120,10 @@ async def grade_sentence(sentence, word):
                     "messages": [
                         {
                             "role": "system",
-                            "content": """
-Grade the sentence based on:
-1. Correct usage of the word
-2. Grammar
-3. Meaningfulness
-
-Be lenient.
-Give higher scores if word is used correctly.
-
+                            "content": """Grade the sentence based on usage, grammar, and meaning.
 Output STRICTLY:
 Result: X/10
-Reason: short
-"""
+Reason: short"""
                         },
                         {
                             "role": "user",
@@ -94,20 +135,17 @@ Reason: short
             ) as res:
 
                 data = await res.json()
-
-                # 🔍 DEBUG PRINT
                 print("AI RAW:", data)
 
-                # ❌ API ERROR CASE
                 if "choices" not in data:
-                    print("AI ERROR RESPONSE:", data)
-                    return "Result: 6/10 Reason: AI issue"
+                    return "Result: 7/10 Reason: AI issue"
 
                 return data["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("AI EXCEPTION:", e)
-        return "Result: 6/10 Reason: system error"
+        return "Result: 7/10 Reason: system error"
+
 
 # ================= WORKER =================
 async def worker():
@@ -135,34 +173,73 @@ async def process(message):
     if not word or word not in content:
         return
 
-    clean = re.sub(r"\s+", " ", content.strip().lower())
+    uid = message.author.id
+
+    # 🔥 ATTEMPT SYSTEM
+    if uid not in g_word.user_attempts:
+        g_word.user_attempts[uid] = 0
+
+    if g_word.user_attempts[uid] >= 2:
+        await message.reply("❌ You have used all 2 attempts.")
+        return
+
+    g_word.user_attempts[uid] += 1
+
+    clean = re.sub(r"\s+", " ", content.strip())
 
     result = await grade_sentence(clean, word)
-    
-    saved = save_submission(message.author.id, clean)
-    
-    
+
+    saved = save_submission(uid, clean)
+
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
 
-    
+    # 🔥 EXTRACT SCORE
+    match = re.search(r"Result:\s*(\d+)/10", result)
+    score = int(match.group(1)) if match else 7
+
     embed = discord.Embed(
         title="📊 Evaluation",
         description=result,
-        color=discord.Color.green()
+        color=get_color(score)
     )
+
+    embed.set_footer(text=f"Attempts: {g_word.user_attempts[uid]}/2")
 
     await message.reply(embed=embed)
 
+
+# ================= LEADERBOARD =================
 def get_leaderboard():
-    cursor.execute("""
+    return safe_execute("""
         SELECT user_id, score
         FROM leaderboard
         ORDER BY score DESC
         LIMIT 10
-    """)
-    return cursor.fetchall()
+    """, fetch=True)
+
+
+def get_user_rank(user_id):
+    row = safe_execute(
+        "SELECT score FROM leaderboard WHERE user_id=%s",
+        (user_id,),
+        fetch=True
+    )
+
+    if not row:
+        return None, 0
+
+    score = row[0][0]
+
+    rank = safe_execute("""
+        SELECT COUNT(*) + 1 FROM leaderboard
+        WHERE score > %s
+    """, (score,), fetch=True)[0][0]
+
+    return rank, score
+
+
 # ================= EVENTS =================
 @client.event
 async def on_message(message):
@@ -177,6 +254,8 @@ async def on_ready():
 
     await tree.sync()
 
+    asyncio.create_task(keep_db_alive())
+
     if not hasattr(client, "started"):
         client.started = True
         asyncio.create_task(g_word.word_loop(client, CHANNEL_ID))
@@ -187,7 +266,7 @@ async def on_ready():
 
 # ================= COMMANDS =================
 
-@tree.command(name="leaderboard", description="Top players")
+@tree.command(name="leaderboard")
 async def leaderboard(interaction: discord.Interaction):
 
     rows = get_leaderboard()
@@ -197,7 +276,6 @@ async def leaderboard(interaction: discord.Interaction):
         return
 
     desc = ""
-
     for i, (uid, score) in enumerate(rows, start=1):
         desc += f"{i}. <@{uid}> — {score}\n"
 
@@ -207,28 +285,41 @@ async def leaderboard(interaction: discord.Interaction):
         color=discord.Color.gold()
     )
 
+    rank, score = get_user_rank(interaction.user.id)
+
+    if rank:
+        embed.set_footer(text=f"Your position: #{rank} (Score: {score})")
+    else:
+        embed.set_footer(text="You are not ranked yet.")
+
     await interaction.response.send_message(embed=embed)
 
 
-@tree.command(name="wod", description="Show current word")
+@tree.command(name="wod")
 async def wod(interaction: discord.Interaction):
+
     word = g_word.current_word
     meaning = g_word.current_meaning
+    dyk = g_word.current_dyk
 
     if not word:
         await interaction.response.send_message("⚠️ No word loaded yet")
         return
 
     embed = discord.Embed(
-        title="📌 Current Word",
-        description=f"**{word.upper()}**\n\n{meaning}",
+        title=f"📌 {word.upper()}",
         color=discord.Color.blue()
     )
+
+    embed.add_field(name="📖 Meaning", value=meaning, inline=False)
+
+    if dyk:
+        embed.add_field(name="🧠 Did You Know?", value=dyk, inline=False)
 
     await interaction.response.send_message(embed=embed)
 
 
-@tree.command(name="fetch", description="Fetch new word manually")
+@tree.command(name="fetch")
 async def fetch(interaction: discord.Interaction):
 
     await interaction.response.defer()
@@ -241,23 +332,25 @@ async def fetch(interaction: discord.Interaction):
         if new_word and new_word != old_word:
             g_word.current_word = new_word
             g_word.current_meaning = new_meaning
+            g_word.current_dyk = did_you_know
             g_word.active_game = True
             g_word.user_attempts.clear()
 
             g_word.save_state(new_word)
 
-            cursor.execute("DELETE FROM submissions")
-            db.commit()
+            safe_execute("DELETE FROM submissions")
 
             embed = discord.Embed(
                 title=f"📌 {new_word.upper()}",
                 color=discord.Color.blue()
             )
+
             embed.add_field(
                 name="📖 Meaning",
                 value=new_meaning or "Not available",
                 inline=False
             )
+
             if did_you_know:
                 embed.add_field(
                     name="🧠 Did You Know?",
