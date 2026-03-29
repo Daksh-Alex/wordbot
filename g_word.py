@@ -52,15 +52,18 @@ def get_wod():
         meaning = ""
         did_you_know = ""
 
-        # 🔍 Extract Meaning (more accurate)
+        # 🔍 Extract Meaning (better accuracy)
         for line in lines:
             if "is used to" in line.lower() or "means" in line.lower():
                 meaning = line
                 break
 
-        # fallback meaning
-        if not meaning and lines:
-            meaning = lines[0]
+        # fallback meaning (avoid garbage)
+        if not meaning:
+            for line in lines:
+                if len(line.split()) > 6:
+                    meaning = line
+                    break
 
         # 🔍 Extract Did You Know
         for i, line in enumerate(lines):
