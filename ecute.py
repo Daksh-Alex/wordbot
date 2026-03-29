@@ -154,63 +154,81 @@ async def grade_sentence(sentence, word):
                 },
                 json={
                     "model": "llama-3.1-8b-instant",
+                    "temperature": 0.2,  # 🔥 consistency boost
                     "messages": [
-                        {"role": "system", "content": """
+                        {
+                            "role": "system",
+                            "content": """
 You are a generous English evaluator.
 
-Your goal is to REWARD users, not punish them.
+CORE RULE:
+Default to HIGH scores unless clearly wrong.
 
-SCORING RULES:
+SCORING LOGIC:
 
-1. If the sentence is grammatically correct AND uses the word correctly:
-→ Give 9 or 10
+10/10:
+- Word used correctly
+- Grammar correct
+- Sentence natural OR creative
 
-2. If the sentence is clear, meaningful, and slightly creative:
-→ Give 10/10
+9/10:
+- Correct but simple
 
-3. If the sentence is simple but correct:
-→ Give 8–10 (prefer 9 or 10)
+8/10:
+- Minor grammar issues but understandable
 
-4. Only give low scores if:
-→ Word is used incorrectly
-→ Sentence makes no sense
-→ Severe grammar issues
+6–7:
+- Noticeable grammar issues OR slightly awkward
 
-5. DO NOT be strict.
-6. DO NOT overthink.
-7. DO NOT penalize small mistakes.
+≤5:
+- Wrong meaning OR broken sentence
 
-CREATIVITY BONUS:
-- Unique ideas
-- Interesting context
-- Natural human-like sentence
-→ ALWAYS give 10/10
+IMPORTANT:
+- DO NOT overthink
+- DO NOT be strict
+- IGNORE small mistakes
+- Reward effort
 
-STRICT OUTPUT FORMAT (NO EXTRA TEXT):
+CREATIVITY RULE:
+Any creative, interesting, or natural sentence → ALWAYS 10/10
+
+CONSISTENCY RULE:
+Same quality → same score every time
+
+STRICT OUTPUT FORMAT:
 Result: X/10
-Reason: short (max 10 words)
+Reason: max 8 words
 
-EXAMPLES:
-
-Sentence: He tried to cadge free drinks at the party.
+GOOD EXAMPLES:
+"He tried to cadge free drinks at the party."
 → Result: 10/10
-→ Reason: correct and natural usage
+→ Reason: natural and correct usage
 
-Sentence: I cadge book from friend.
+"I cadge help from friends sometimes."
+→ Result: 10/10
+→ Reason: simple but correct
+
+BAD EXAMPLES:
+"I cadge book yesterday."
 → Result: 6/10
-→ Reason: grammar weak but meaning clear
+→ Reason: grammar issues
 
-Sentence: Cadge means running fast.
+"Cadge means running fast."
 → Result: 2/10
-→ Reason: incorrect usage
-                        """},
-                        {"role": "user", "content": f"""
+→ Reason: incorrect meaning
+"""
+                        },
+                        {
+                            "role": "user",
+                            "content": f"""
 Word: {word}
 
-Evaluate this sentence kindly:
+Be generous. Reward correctness and creativity.
 
+Sentence:
 {sentence}
-                        """}
+"""
+                        }
                     ]
                 },
                 timeout=aiohttp.ClientTimeout(total=6)
@@ -220,14 +238,14 @@ Evaluate this sentence kindly:
                 print("AI RAW:", data)
 
                 if "choices" not in data:
-                    return "Result: 7/10 Reason: AI issue"
+                    return "Result: 9/10 Reason: AI fallback"
 
                 return data["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("AI EXCEPTION:", e)
-        return "Result: 7/10 Reason: system error"
-
+        return "Result: 9/10 Reason: system fallback"
+        
 
 # ================= WORKER =================
 async def worker():
