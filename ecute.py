@@ -70,6 +70,14 @@ def safe_execute(query, params=None, fetch=False):
 
         return None
 
+def update_leaderboard(user_id, score):
+    safe_execute("""
+        INSERT INTO leaderboard (user_id, score)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE score = score + %s
+    """, (user_id, score, score))
+
+
 
 async def keep_db_alive():
     global db, cursor
