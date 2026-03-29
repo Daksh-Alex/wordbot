@@ -32,7 +32,7 @@ def get_db():
     )
 
 db = get_db()
-cursor = db.cursor()
+cursor = db.cursor(buffered=True)
 
 
 def safe_execute(query, params=None, fetch=False):
