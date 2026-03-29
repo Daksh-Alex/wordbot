@@ -214,6 +214,10 @@ async def process(message):
 
     match = re.search(r"Result:\s*(\d+)/10", result)
     score = int(match.group(1)) if match else 7
+    
+    is_first_attempt = g_word.user_attempts[uid] == 1
+    if is_first_attempt:
+        update_leaderboard(uid, score)
 
     embed = discord.Embed(
         title="📊 Evaluation",
