@@ -176,23 +176,22 @@ async def process(message):
     uid = message.author.id
 
     # 🔥 ATTEMPT SYSTEM
-    if uid not in g_word.user_attempts:
-        g_word.user_attempts[uid] = 0
-
-    if g_word.user_attempts[uid] >= 2:
-        await message.reply("❌ You have used all 2 attempts.")
-        return
-
-    g_word.user_attempts[uid] += 1
-
     clean = re.sub(r"\s+", " ", content.strip())
-
+    
+    # 🔒 duplicate check FIRST
     saved = save_submission(uid, clean)
-
     if not saved:
         await message.reply("❌ This sentence has already been used.")
         return
+    # 🎯 attempt system AFTER duplicate passes
+    if uid not in g_word.user_attempts:
+        g_word.user_attempts[uid] = 0
         
+    if g_word.user_attempts[uid] >= 2:
+        await message.reply("❌ You have used all 2 attempts.")
+        return
+    g_word.user_attempts[uid] += 1
+    # 🤖 now call AI
     result = await grade_sentence(clean, word)
 
     # 🔥 EXTRACT SCORE
