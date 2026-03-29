@@ -71,7 +71,7 @@ def get_wod():
             ):
                 if len(line.split()) > 6:
                     meaning = line.strip(":- ")
-                   break
+                    break
         # 🔁 fallback (safe)
         if not meaning:
             for line in lines:
