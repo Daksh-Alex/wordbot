@@ -44,15 +44,9 @@ def safe_execute(query, params=None, fetch=False):
         cursor.execute(query, params or ())
 
         if fetch:
-            result = cursor.fetchall()
-        else:
-            try:
-                cursor.fetchall()
-            except:
-                pass
-            result = None
+            return cursor.fetchall()
 
-        return result
+        return None
 
     except mysql.connector.errors.IntegrityError:
         return "DUPLICATE"
@@ -67,13 +61,14 @@ def safe_execute(query, params=None, fetch=False):
             cursor.execute(query, params or ())
             if fetch:
                 return cursor.fetchall()
+
         except Exception as e2:
             print("Reconnect failed:", e2)
 
         return None
 
 
-# ================= WOD (SQL STORAGE) =================
+# ================= WOD =================
 
 def save_wod(word, meaning, dyk):
     safe_execute("""
@@ -106,6 +101,8 @@ def update_leaderboard(user_id, score):
     """, (user_id, score, score))
 
 
+# ================= KEEP ALIVE =================
+
 async def keep_db_alive():
     global db, cursor
     while True:
@@ -115,7 +112,7 @@ async def keep_db_alive():
             try:
                 db.reconnect(attempts=3, delay=2)
                 cursor = db.cursor(buffered=True)
-                print("DB reconnected (keepalive)")
+                print("DB reconnected")
             except Exception as e:
                 print("Keepalive failed:", e)
 
@@ -123,10 +120,12 @@ async def keep_db_alive():
 
 
 # ================= QUEUE =================
+
 queue = asyncio.Queue(maxsize=100)
 
 
 # ================= DUPLICATE =================
+
 def save_submission(user_id, sentence):
     result = safe_execute(
         "INSERT INTO submissions (user_id, sentence) VALUES (%s,%s)",
@@ -135,7 +134,8 @@ def save_submission(user_id, sentence):
     return result != "DUPLICATE"
 
 
-# ================= SCORE COLOR =================
+# ================= COLOR =================
+
 def get_color(score):
     if score <= 5:
         return discord.Color.red()
@@ -146,6 +146,7 @@ def get_color(score):
 
 
 # ================= AI =================
+
 async def grade_sentence(sentence, word):
     try:
         async with aiohttp.ClientSession() as session:
@@ -157,68 +158,25 @@ async def grade_sentence(sentence, word):
                 },
                 json={
                     "model": "llama-3.1-8b-instant",
-                    "temperature": 0.2,  # 🔥 consistency boost
+                    "temperature": 0.15,
                     "messages": [
                         {
                             "role": "system",
                             "content": """
 You are a generous English evaluator.
 
-CORE RULE:
 Default to HIGH scores unless clearly wrong.
 
-SCORING LOGIC:
+10/10 → correct + natural or creative
+9/10 → correct but simple
+8/10 → minor issues
+≤7 → noticeable issues
 
-10/10:
-- Word used correctly
-- Grammar correct
-- Sentence natural OR creative
+Creative sentences ALWAYS get 10.
 
-9/10:
-- Correct but simple
-
-8/10:
-- Minor grammar issues but understandable
-
-6–7:
-- Noticeable grammar issues OR slightly awkward
-
-≤5:
-- Wrong meaning OR broken sentence
-
-IMPORTANT:
-- DO NOT overthink
-- DO NOT be strict
-- IGNORE small mistakes
-- Reward effort
-
-CREATIVITY RULE:
-Any creative, interesting, or natural sentence → ALWAYS 10/10
-
-CONSISTENCY RULE:
-Same quality → same score every time
-
-STRICT OUTPUT FORMAT:
+STRICT FORMAT:
 Result: X/10
-Reason: max 8 words
-
-GOOD EXAMPLES:
-"He tried to cadge free drinks at the party."
-→ Result: 10/10
-→ Reason: natural and correct usage
-
-"I cadge help from friends sometimes."
-→ Result: 10/10
-→ Reason: simple but correct
-
-BAD EXAMPLES:
-"I cadge book yesterday."
-→ Result: 6/10
-→ Reason: grammar issues
-
-"Cadge means running fast."
-→ Result: 2/10
-→ Reason: incorrect meaning
+Reason: short
 """
                         },
                         {
@@ -226,7 +184,7 @@ BAD EXAMPLES:
                             "content": f"""
 Word: {word}
 
-Be generous. Reward correctness and creativity.
+Be generous.
 
 Sentence:
 {sentence}
@@ -238,19 +196,18 @@ Sentence:
             ) as res:
 
                 data = await res.json()
-                print("AI RAW:", data)
 
                 if "choices" not in data:
-                    return "Result: 9/10 Reason: AI fallback"
+                    return "Result: 10/10\nReason: default reward"
 
                 return data["choices"][0]["message"]["content"]
 
-    except Exception as e:
-        print("AI EXCEPTION:", e)
-        return "Result: 9/10 Reason: system fallback"
-        
+    except Exception:
+        return "Result: 10/10\nReason: fallback reward"
+
 
 # ================= WORKER =================
+
 async def worker():
     while True:
         msg = await queue.get()
@@ -285,37 +242,34 @@ async def process(message):
         if not word or word not in content:
             return
 
-        # 🔥 NORMALIZE (fix duplicates)
+        # 🔥 normalize
         clean = re.sub(r"\s+", " ", content.strip().lower())
         clean = clean.rstrip(".!?")
 
         if not save_submission(uid, clean):
-            await message.reply("❌ This sentence has already been used.")
+            await message.reply("❌ Already used sentence.")
             return
 
-        current_attempts = g_word.user_attempts.get(uid, 0)
+        attempts = g_word.user_attempts.get(uid, 0)
 
-        if current_attempts >= 2:
-            await message.reply("❌ You have used all 2 attempts.")
+        if attempts >= 2:
+            await message.reply("❌ Only 2 attempts allowed.")
             return
 
-        is_first_attempt = current_attempts == 0
-        g_word.user_attempts[uid] = current_attempts + 1
+        is_first = attempts == 0
+        g_word.user_attempts[uid] = attempts + 1
 
         result = await grade_sentence(clean, word)
 
         match = re.search(r"Result:\s*(\d+)/10", result)
-        score = int(match.group(1)) if match else 7
+        score = int(match.group(1)) if match else 10
 
-        if is_first_attempt:
+        if is_first:
             update_leaderboard(uid, score)
 
-        # 🔥 CREATIVE DETECTION
         creative = score == 10 and len(clean.split()) > 8
 
-        title = "📊 Evaluation"
-        if creative:
-            title += " 🔥"
+        title = "📊 Evaluation 🔥" if creative else "📊 Evaluation"
 
         embed = discord.Embed(
             title=title,
@@ -323,22 +277,27 @@ async def process(message):
             color=get_color(score)
         )
 
-        if is_first_attempt:
-            embed.set_footer(text="🏆 Counted attempt (1/2)")
-        else:
-            embed.set_footer(text="🧪 Practice attempt")
+        embed.set_footer(
+            text="🏆 Counted attempt" if is_first else "🧪 Practice"
+        )
 
         await message.reply(embed=embed)
 
     finally:
-        # 🔥 ALWAYS REMOVE USER (CRITICAL)
         processing_users.discard(uid)
 
+
 # ================= EVENTS =================
+
 @client.event
 async def on_message(message):
-    if not queue.full():
-        await queue.put(message)
+    if queue.full():
+        return
+
+    if message.author.id in processing_users:
+        return
+
+    await queue.put(message)
 
 
 @client.event
@@ -348,7 +307,6 @@ async def on_ready():
     await tree.sync()
     asyncio.create_task(keep_db_alive())
 
-    # 🔥 LOAD WOD FROM SQL
     state = load_wod()
     if state:
         g_word.current_word, g_word.current_meaning, g_word.current_dyk = state
