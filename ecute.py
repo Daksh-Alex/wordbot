@@ -59,7 +59,7 @@ def safe_execute(query, params=None, fetch=False):
 
         try:
             db.reconnect(attempts=3, delay=2)
-            cursor = db.cursor()
+            cursor = db.cursor(buffered=True)
 
             cursor.execute(query, params or ())
             if fetch:
@@ -111,7 +111,7 @@ async def keep_db_alive():
         except:
             try:
                 db.reconnect(attempts=3, delay=2)
-                cursor = db.cursor()
+                cursor = db.cursor(buffered=True)
                 print("DB reconnected (keepalive)")
             except Exception as e:
                 print("Keepalive failed:", e)
