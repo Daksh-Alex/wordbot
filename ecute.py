@@ -352,7 +352,7 @@ async def wod(interaction: discord.Interaction):
 async def fetch(interaction: discord.Interaction):
     await interaction.response.defer()
 
-    new_word, new_meaning, did_you_know = g_word.get_wod()
+    new_word, new_meaning = g_word.get_wod()
 
     if not new_word:
         await interaction.followup.send("⚠️ Failed to fetch word")
@@ -360,18 +360,14 @@ async def fetch(interaction: discord.Interaction):
 
     g_word.current_word = new_word
     g_word.current_meaning = new_meaning
-    g_word.current_dyk = did_you_know
     g_word.active_game = True
     g_word.user_attempts.clear()
 
-    save_wod(new_word, new_meaning, did_you_know)
+    save_wod(new_word, new_meaning)
     clear_submissions()
 
     embed = discord.Embed(title=f"📌 {new_word.upper()}", color=discord.Color.blue())
     embed.add_field(name="📖 Meaning", value=new_meaning, inline=False)
-
-    if did_you_know:
-        embed.add_field(name="🧠 Did You Know?", value=did_you_know, inline=False)
 
     await interaction.followup.send(embed=embed)
 
