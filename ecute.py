@@ -96,7 +96,7 @@ def update_leaderboard(user_id, score):
     safe_execute("""
         INSERT INTO leaderboard (user_id, score)
         VALUES (%s, %s)
-        ON DUPLICATE KEY UPDATE score = score + %s
+        ON DUPLICATE KEY UPDATE score = GREATEST(score, %s)
     """, (user_id, score, score))
 
 
