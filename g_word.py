@@ -29,7 +29,6 @@ def get_wod():
         lines = [l.strip() for l in text.split("\n") if l.strip()]
 
         meaning = ""
-        did_you_know = ""
 
         # 🔍 Extract Meaning (robust)
         for line in lines:
@@ -68,21 +67,9 @@ def get_wod():
                 if len(line.split()) > 6:
                     meaning = line.strip(":- ")
                     break
+        
 
-        # 🔍 Extract Did You Know
-        for i, line in enumerate(lines):
-            if "did you know" in line.lower():
-                collected = []
-                for l in lines[i+1:]:
-                    if l.lower().startswith("see the entry") or "example" in l.lower():
-                        break
-                    collected.append(l)
-                did_you_know = " ".join(collected)
-                if len(did_you_know) > 500:
-                    did_you_know = did_you_know[:497].rsplit(" ", 1)[0] + "..."
-                break
-
-        return word, meaning, did_you_know
+        return word, meaning
 
     except Exception as e:
         print("RSS error:", e)
@@ -96,7 +83,7 @@ async def word_loop(bot, channel_id, save_wod, clear_submissions):
 
     while True:
         try:
-            word, meaning, did_you_know = get_wod()
+            word, meaning = get_wod()
 
             if not word:
                 await asyncio.sleep(120)
@@ -135,13 +122,6 @@ async def word_loop(bot, channel_id, save_wod, clear_submissions):
                         value=meaning or "Not available",
                         inline=False
                     )
-
-                    if did_you_know:
-                        embed.add_field(
-                            name="🧠 Did You Know?",
-                            value=did_you_know,
-                            inline=False
-                        )
 
                     embed.set_footer(text="Word of the Day")
 
