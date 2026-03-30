@@ -73,7 +73,7 @@ def safe_execute(query, params=None, fetch=False):
 def save_wod(word, meaning):
     safe_execute("""
         INSERT INTO wod (id, word, meaning)
-        VALUES (1, %s, %s, %s)
+        VALUES (1, %s, %s)
         ON DUPLICATE KEY UPDATE
             word = %s,
             meaning = %s,
@@ -347,7 +347,7 @@ async def wod(interaction: discord.Interaction):
 async def fetch(interaction: discord.Interaction):
     await interaction.response.defer()
 
-    new_word, new_meaning = g_word.get_wod()
+    new_word, new_meaning, _ = g_word.get_wod()
 
     if not new_word:
         await interaction.followup.send("⚠️ Failed to fetch word")
