@@ -70,20 +70,19 @@ def safe_execute(query, params=None, fetch=False):
 
 # ================= WOD =================
 
-def save_wod(word, meaning, dyk):
+def save_wod(word, meaning):
     safe_execute("""
-        INSERT INTO wod (id, word, meaning, dyk)
+        INSERT INTO wod (id, word, meaning)
         VALUES (1, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             word = %s,
             meaning = %s,
-            dyk = %s
-    """, (word, meaning, dyk, word, meaning, dyk))
+    """, (word, meaning, word, meaning))
 
 
 def load_wod():
     row = safe_execute(
-        "SELECT word, meaning, dyk FROM wod WHERE id=1",
+        "SELECT word, meaning FROM wod WHERE id=1",
         fetch=True
     )
     return row[0] if row else None
@@ -309,7 +308,7 @@ async def on_ready():
 
     state = load_wod()
     if state:
-        g_word.current_word, g_word.current_meaning, g_word.current_dyk = state
+        g_word.current_word, g_word.current_meaning = state
         g_word.active_game = True
 
     if not hasattr(client, "started"):
@@ -333,7 +332,6 @@ async def on_ready():
 async def wod(interaction: discord.Interaction):
     word = g_word.current_word
     meaning = g_word.current_meaning
-    dyk = g_word.current_dyk
 
     if not word:
         await interaction.response.send_message("⚠️ No word loaded yet")
@@ -341,9 +339,6 @@ async def wod(interaction: discord.Interaction):
 
     embed = discord.Embed(title=f"📌 {word.upper()}", color=discord.Color.blue())
     embed.add_field(name="📖 Meaning", value=meaning, inline=False)
-
-    if dyk:
-        embed.add_field(name="🧠 Did You Know?", value=dyk, inline=False)
 
     await interaction.response.send_message(embed=embed)
 
