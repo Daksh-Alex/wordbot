@@ -93,21 +93,19 @@ async def word_loop(bot, channel_id, save_wod, clear_submissions):
             if current_word is None:
                 current_word = word
                 current_meaning = meaning
-                current_dyk = did_you_know
                 active_game = True
 
                 # 🔥 save to DB
-                save_wod(word, meaning, did_you_know)
+                save_wod(word, meaning)
 
             # new word detected
             elif word != current_word:
                 current_word = word
                 current_meaning = meaning
-                current_dyk = did_you_know
                 active_game = True
                 user_attempts.clear()
 
-                save_wod(word, meaning, did_you_know)
+                save_wod(word, meaning)
                 clear_submissions()
 
                 channel = bot.get_channel(channel_id)
