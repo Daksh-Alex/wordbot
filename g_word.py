@@ -72,7 +72,14 @@ def get_wod():
         # 🔍 Extract Did You Know
         for i, line in enumerate(lines):
             if "did you know" in line.lower():
-                did_you_know = " ".join(lines[i+1:i+3])[:300]
+                collected = []
+                for l in lines[i+1:]:
+                    if l.lower().startswith("see the entry") or "example" in l.lower():
+                        break
+                    collected.append(l)
+                did_you_know = " ".join(collected)
+                if len(did_you_know) > 500:
+                    did_you_know = did_you_know[:497].rsplit(" ", 1)[0] + "..."
                 break
 
         return word, meaning, did_you_know
