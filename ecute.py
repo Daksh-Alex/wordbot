@@ -347,7 +347,7 @@ async def wod(interaction: discord.Interaction):
 async def fetch(interaction: discord.Interaction):
     await interaction.response.defer()
 
-    new_word, new_meaning, _ = g_word.get_wod()
+    new_word, new_meaning = g_word.get_wod()
 
     if not new_word:
         await interaction.followup.send("⚠️ Failed to fetch word")
