@@ -76,7 +76,7 @@ def save_wod(word, meaning):
         VALUES (1, %s, %s)
         ON DUPLICATE KEY UPDATE
             word = %s,
-            meaning = %s,
+            meaning = %s
     """, (word, meaning, word, meaning))
 
 
